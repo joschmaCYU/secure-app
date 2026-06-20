@@ -75,5 +75,4 @@ const payload = {
 
 ## 5. Impossibilité d'interception et de lecture par des tiers
 L'architecture mise en place protège les données contre deux vecteurs d'attaque majeurs :
-- **L'interception réseau** : La requête vers l'API transite obligatoirement via le protocole HTTPS (TLS). Cela crée un tunnel de communication chiffré. Un tiers interceptant le trafic réseau ne verrait qu'un flux de données illisible entre le client et le serveur.
 - **Vol de la base de données** : Le backend Node.js ne possède aucune logique de déchiffrement. Il se contente d'enregistrer le ciphertext dans la base SQLite. En cas d'intrusion sur le serveur ou de vol physique du fichier de base de données, l'attaquant n'aura accès qu'à des chaînes de caractères aléatoires. Sans la clé de l'utilisateur, l'algorithme AES-256 est considéré comme inviolable par la puissance de calcul actuelle.
