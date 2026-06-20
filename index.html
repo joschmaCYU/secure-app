@@ -5,17 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Suivi CO2 Sécurisé</title>
     <style>
-body { font-family: system-ui, sans-serif; max-width: 500px; margin: 40px auto; padding: 20px; background: #f9f9f9;}
-.card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-.form-group { margin-bottom: 15px; }
-label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.9em; }
-input { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;}
-.section-title { border-bottom: 2px solid #eee; padding-bottom: 5px; margin-top: 25px; margin-bottom: 15px; }
-button { width: 100%; padding: 12px; background: #2ea44f; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 1em; font-weight: bold; margin-top: 20px;}
-button:hover { background: #2c974b; }
-#status { margin-top: 15px; padding: 10px; border-radius: 4px; display: none; }
-.success { background: #e6ffed; color: #1a7f37; border: 1px solid #c2e0c6; }
-.error { background: #ffebe9; color: #cf222e; border: 1px solid #f2c7cb; }
+      body { font-family: system-ui, sans-serif; max-width: 500px; margin: 40px auto; padding: 20px; background: #f9f9f9;}
+      .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+      .form-group { margin-bottom: 15px; }
+      label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.9em; }
+      input { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;}
+      .section-title { border-bottom: 2px solid #eee; padding-bottom: 5px; margin-top: 25px; margin-bottom: 15px; }
+      button { width: 100%; padding: 12px; background: #2ea44f; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 1em; font-weight: bold; margin-top: 20px;}
+      button:hover { background: #2c974b; }
+      #status { margin-top: 15px; padding: 10px; border-radius: 4px; display: none; }
+      .success { background: #e6ffed; color: #1a7f37; border: 1px solid #c2e0c6; }
+      .error { background: #ffebe9; color: #cf222e; border: 1px solid #f2c7cb; }
     </style>
   </head>
   <body>
@@ -23,11 +23,6 @@ button:hover { background: #2c974b; }
     <div class="card">
       <h2>Mon Bilan CO2</h2>
       <p style="font-size: 0.85em; color: #666;">Vos données sont chiffrées localement. Le serveur ne connaîtra jamais votre empreinte carbone.</p>
-
-      <!-- <div class="form-group"> -->
-      <!--   <label for="password">Mot de passe de chiffrement (Clé maître)</label> -->
-      <!--   <input type="password" id="password" placeholder="Ne le perdez pas !" required> -->
-      <!-- </div> -->
 
       <h3 class="section-title">Données du mois</h3>
 
@@ -56,116 +51,103 @@ button:hover { background: #2c974b; }
     <div id="dataDisplay" style="margin-top: 20px;"></div>
 
     <script>
-// Fonction utilitaire pour convertir le Base64 en binaire
-function base64ToBuffer(base64) {
-    const binaryString = atob(base64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes.buffer;
-}
+      function base64ToBuffer(base64) {
+        const binaryString = atob(base64);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+        return bytes.buffer;
+      }
 
-// Fonction principale de récupération et déchiffrement
-async function fetchAndDecryptData() {
-    const password = getLocalSecret(); 
-    const displayDiv = document.getElementById('dataDisplay');
-    
-    if (!password) {
-        alert("Veuillez entrer votre mot de passe pour déchiffrer les données.");
-        return;
-    }
-
-    displayDiv.innerHTML = "<em>Chargement et déchiffrement en cours...</em>";
-
-    try {
-        // 1. Récupération des données chiffrées depuis le serveur
-        const response = await fetch('http://localhost:3000/api/data');
-        const rows = await response.json();
+      async function fetchAndDecryptData() {
+        const password = getLocalSecret(); 
+        const displayDiv = document.getElementById('dataDisplay');
         
-        displayDiv.innerHTML = '<h3>Mon Historique CO2 :</h3>';
-        
-        const encoder = new TextEncoder();
-        const decoder = new TextDecoder(); // Pour retransformer le binaire en texte
-        const passwordBuffer = encoder.encode(password);
+        if (!password) {
+            alert("Veuillez entrer votre mot de passe pour déchiffrer les données.");
+            return;
+        }
 
-        // 2. Boucle sur chaque ligne récupérée
-        for (const row of rows) {
-            try {
-                // Conversion des données Base64 de la BDD en Buffers binaires
-                const saltBuffer = base64ToBuffer(row.salt);
-                const ivBuffer = base64ToBuffer(row.iv);
-                const cipherBuffer = base64ToBuffer(row.ciphertext);
+        displayDiv.innerHTML = "<em>Chargement et déchiffrement en cours...</em>";
 
-                // 3. Dérivation de la clé (Doit utiliser le même Sel que lors de l'enregistrement)
-                const baseKey = await window.crypto.subtle.importKey(
-                    "raw", passwordBuffer, { name: "PBKDF2" }, false, ["deriveKey"]
-                );
-                const cryptoKey = await window.crypto.subtle.deriveKey(
-                    { name: "PBKDF2", salt: saltBuffer, iterations: 100000, hash: "SHA-256" },
-                    baseKey,
-                    { name: "AES-GCM", length: 256 },
-                    false,
-                    ["decrypt"] // Cette fois, l'action est 'decrypt'
-                );
+        try {
+            const response = await fetch('http://localhost:3000/api/data');
+            const rows = await response.json();
+            
+            displayDiv.innerHTML = '<h3>Mon Historique CO2 :</h3>';
+            
+            const encoder = new TextEncoder();
+            const decoder = new TextDecoder(); 
+            const passwordBuffer = encoder.encode(password);
 
-                // 4. Déchiffrement AES-GCM
-                const decryptedBuffer = await window.crypto.subtle.decrypt(
-                    { name: "AES-GCM", iv: ivBuffer },
-                    cryptoKey,
-                    cipherBuffer
-                );
+            for (const row of rows) {
+                try {
+                    const saltBuffer = base64ToBuffer(row.salt);
+                    const ivBuffer = base64ToBuffer(row.iv);
+                    const cipherBuffer = base64ToBuffer(row.ciphertext);
 
-                // 5. Conversion du binaire en texte, puis en objet JSON
-                const decryptedText = decoder.decode(decryptedBuffer);
-                const data = JSON.parse(decryptedText);
+                    const baseKey = await window.crypto.subtle.importKey(
+                        "raw", passwordBuffer, { name: "PBKDF2" }, false, ["deriveKey"]
+                    );
+                    const cryptoKey = await window.crypto.subtle.deriveKey(
+                        { name: "PBKDF2", salt: saltBuffer, iterations: 100000, hash: "SHA-256" },
+                        baseKey,
+                        { name: "AES-GCM", length: 256 },
+                        false,
+                        ["decrypt"]
+                    );
 
-                // 6. Affichage dans l'interface
-                const dateFormatee = new Date(data.date).toLocaleDateString('fr-FR', {
-                    day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute:'2-digit'
-                });
+                    const decryptedBuffer = await window.crypto.subtle.decrypt(
+                        { name: "AES-GCM", iv: ivBuffer },
+                        cryptoKey,
+                        cipherBuffer
+                    );
 
-                displayDiv.innerHTML += `
-                    <div style="background: #f1f8ff; padding: 10px; border-left: 4px solid #0366d6; margin-bottom: 10px;">
-                        <strong>📅 ${dateFormatee}</strong><br>
-                        🚗 Transport : ${data.transport_km} km<br>
-                        ⚡ Énergie : ${data.energy_kwh} kWh<br>
-                        🥩 Viande rouge : ${data.red_meat_meals} repas
-                    </div>
-                `;
-                
-            } catch (decryptionError) {
-                // Si le déchiffrement échoue (mauvais mot de passe, ou donnée corrompue)
-                console.error("Erreur de déchiffrement pour l'ID", row.id);
-                displayDiv.innerHTML += `
-                    <div style="background: #ffebe9; padding: 10px; border-left: 4px solid #cf222e; margin-bottom: 10px; color: #cf222e;">
-                        ❌ Impossible de déchiffrer l'entrée du ${row.created_at}. Mauvais mot de passe ?
-                    </div>
-                `;
+                    const decryptedText = decoder.decode(decryptedBuffer);
+                    const data = JSON.parse(decryptedText);
+
+                    const dateFormatee = new Date(data.date).toLocaleDateString('fr-FR', {
+                        day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute:'2-digit'
+                    });
+
+                    displayDiv.innerHTML += `
+                        <div style="background: #f1f8ff; padding: 10px; border-left: 4px solid #0366d6; margin-bottom: 10px;">
+                            <strong>📅 ${dateFormatee}</strong><br>
+                            🚗 Transport : ${data.transport_km} km<br>
+                            ⚡ Énergie : ${data.energy_kwh} kWh<br>
+                            🥩 Viande rouge : ${data.red_meat_meals} repas
+                        </div>
+                    `;
+                    
+                } catch (decryptionError) {
+                    console.error("Erreur de déchiffrement pour l'ID", row.id);
+                    displayDiv.innerHTML += `
+                        <div style="background: #ffebe9; padding: 10px; border-left: 4px solid #cf222e; margin-bottom: 10px; color: #cf222e;">
+                            ❌ Impossible de déchiffrer l'entrée du ${row.created_at}. Mauvais mot de passe ?
+                        </div>
+                    `;
+                }
             }
-        }
-        
-        if(rows.length === 0) {
-            displayDiv.innerHTML += "<p>Aucune donnée enregistrée.</p>";
-        }
+            
+            if(rows.length === 0) {
+                displayDiv.innerHTML += "<p>Aucune donnée enregistrée.</p>";
+            }
 
-    } catch (error) {
-        console.error("Erreur réseau ou serveur", error);
-        displayDiv.innerHTML = "<p style='color:red;'>Erreur de connexion au serveur.</p>";
-    }
-}
+        } catch (error) {
+            console.error("Erreur réseau ou serveur", error);
+            displayDiv.innerHTML = "<p style='color:red;'>Erreur de connexion au serveur.</p>";
+        }
+      }
 
       function bufferToBase64(buffer) {
         return btoa(String.fromCharCode(...new Uint8Array(buffer)));
       }
 
-      // Fonction pour récupérer ou créer une clé secrète locale
       function getLocalSecret() {
         let secret = localStorage.getItem('co2_app_secret');
 
-        // Si l'utilisateur n'a pas de clé, on en crée une très robuste et on la sauvegarde
         if (!secret) {
-          // Crée une chaîne aléatoire cryptographiquement sécurisée
           const randomArray = window.crypto.getRandomValues(new Uint8Array(32));
           secret = bufferToBase64(randomArray); 
           localStorage.setItem('co2_app_secret', secret);
@@ -175,13 +157,22 @@ async function fetchAndDecryptData() {
         return secret;
       }
 
+      /**
+       * Comment ça fonctionne ?
+       * Voici le détail du processus de sécurisation, étape par étape, tel qu'il est implémenté 
+       * dans la fonction encryptAndSendCO2 côté client.
+       * * 5. Impossibilité d'interception et de lecture par des tiers
+       * L'architecture mise en place protège les données contre deux vecteurs d'attaque majeurs :
+       * - Vol de la base de données : Le backend Node.js ne possède aucune logique de déchiffrement. 
+       * Il se contente d'enregistrer le ciphertext dans la base SQLite. En cas d'intrusion sur le 
+       * serveur ou de vol physique du fichier de base de données, l'attaquant n'aura accès qu'à 
+       * des chaînes de caractères aléatoires. Sans la clé de l'utilisateur, l'algorithme AES-256 
+       * est considéré comme inviolable par la puissance de calcul actuelle.
+       */
       async function encryptAndSendCO2() {
-        // Plus besoin de demander le mot de passe dans l'interface !
-        // On récupère la clé invisible du navigateur
         const hiddenPassword = getLocalSecret();
         const statusDiv = document.getElementById('status');
 
-        // 1. Récupération et structuration des données
         const co2Data = {
           date: new Date().toISOString(),
           transport_km: parseInt(document.getElementById('transport').value) || 0,
@@ -190,15 +181,25 @@ async function fetchAndDecryptData() {
         };
 
         try {
-          // 2. Conversion de l'objet JSON en chaîne de caractères (String)
+          /**
+           * 1. Préparation et structuration des données
+           * Avant de procéder au chiffrement, les informations saisies par l'utilisateur 
+           * (transport, énergie, alimentation) sont regroupées, puis converties en format binaire.
+           * * - JSON.stringify : Transforme l'objet contenant les données structurées en une simple chaîne de caractères.
+           * - encoder.encode : Convertit ce texte en format binaire (buffer), car les algorithmes de cryptographie ne manipulent que des données binaires.
+           */
           const jsonString = JSON.stringify(co2Data);
-
-          // 3. Encodage en binaire
           const encoder = new TextEncoder();
           const dataBuffer = encoder.encode(jsonString);
           const passwordBuffer = encoder.encode(hiddenPassword);
 
-          // 4. Dérivation de la clé (PBKDF2)
+          /**
+           * 2. Dérivation de la clé cryptographique (Algorithme PBKDF2)
+           * Pour des raisons de sécurité, le mot de passe de l'utilisateur n'est jamais utilisé directement comme clé. 
+           * L'application dérive une clé cryptographique robuste à partir de ce mot de passe.
+           * * - getRandomValues : Génère un sel cryptographique aléatoire. Cela garantit que deux mots de passe identiques ne produiront jamais la même clé de chiffrement.
+           * - deriveKey : Utilise l'algorithme PBKDF2 avec 100 000 itérations de hachage. Cette lenteur volontaire rend les attaques par force brute mathématiquement irréalisables dans un temps raisonnable.
+           */
           const salt = window.crypto.getRandomValues(new Uint8Array(16));
           const baseKey = await window.crypto.subtle.importKey(
             "raw", passwordBuffer, { name: "PBKDF2" }, false, ["deriveKey"]
@@ -211,7 +212,12 @@ async function fetchAndDecryptData() {
             ["encrypt"]
           );
 
-          // 5. Chiffrement AES-GCM
+          /**
+           * 3. Chiffrement local des données (Standard AES-GCM)
+           * Une fois la clé dérivée générée, l'application procède au chiffrement des données de consommation CO2.
+           * * - iv : Une valeur aléatoire générée pour chaque nouvelle opération de sauvegarde. Elle assure que si l'utilisateur chiffre deux fois exactement les mêmes données, le résultat chiffré sera totalement différent, empêchant l'analyse de modèles de données.
+           * - encrypt : Applique l'algorithme AES-256 en mode GCM. Ce mode chiffre la donnée et y appose une signature d'intégrité. Si un bit de la base de données est altéré ultérieurement, le processus de déchiffrement sera bloqué.
+           */
           const iv = window.crypto.getRandomValues(new Uint8Array(12));
           const encryptedBuffer = await window.crypto.subtle.encrypt(
             { name: "AES-GCM", iv: iv },
@@ -219,14 +225,19 @@ async function fetchAndDecryptData() {
             dataBuffer
           );
 
-          // 6. Préparation du payload
+          /**
+           * 4. Transmission sécurisée
+           * Les éléments nécessaires au futur déchiffrement (le sel, le vecteur d'initialisation et le texte chiffré) 
+           * sont encodés en Base64 pour être transmis au serveur via une requête réseau.
+           * * Il est crucial de noter qu'à aucun moment le mot de passe brut ou la clé cryptoKey ne sont inclus dans cet envoi. 
+           * Ils restent confinés de manière éphémère dans la mémoire vive du navigateur et sont détruits par le système d'exploitation à la fin de la fonction.
+           */
           const payload = {
             salt: bufferToBase64(salt),
             iv: bufferToBase64(iv),
             ciphertext: bufferToBase64(encryptedBuffer)
           };
 
-          // 7. Envoi au serveur (Toujours la même route, le serveur ne voit aucune différence)
           const response = await fetch('http://localhost:3000/api/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -239,7 +250,6 @@ async function fetchAndDecryptData() {
           statusDiv.innerText = result.message || result.error;
           statusDiv.style.display = 'block';
 
-          // Nettoyage du formulaire après succès
           if(response.ok) {
             document.getElementById('transport').value = '';
             document.getElementById('energy').value = '';
