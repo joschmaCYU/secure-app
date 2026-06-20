@@ -1,6 +1,8 @@
 # secure-app
 Un POC pour montrer comment stoquer des info de manière sécurisé. 
 
+https://github.com/user-attachments/assets/61f9ca90-7918-4855-b1eb-b75ceb5391d9
+
 # Sécurité des données : chiffrement de bout en bout
 
 Ce projet intègre une architecture de sécurité visant à garantir la confidentialité absolue des données saisies par l'utilisateur. Le principe fondamental est que le serveur backend agit uniquement comme un espace de stockage passif. Les données sont chiffrées localement sur le pc/téléphone de l'utilisateur, et le serveur n'a jamais connaissance de la clé de déchiffrement ni des données en clair.
